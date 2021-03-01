@@ -1,4 +1,4 @@
-#include <Stepper.h>
+#include <Stepper_28BYJ_48.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <PubSubClient.h>
@@ -17,12 +17,12 @@
 //--------------- CHANGE PARAMETERS ------------------
 //Configure Default Settings for Access Point logon
 String APid = "BlindsConnectAP";    //Name of access point
-String APpw = "nidayand";           //Hardcoded password for access point
+String APpw = "CTGkePRCZILzIIhv";           //Hardcoded password for access point
 
 //----------------------------------------------------
 
 // Version number for checking if there are new code releases and notifying the user
-String version = "1.3.3";
+String version = "1.4.0";
 
 NidayandHelper helper = NidayandHelper();
 
@@ -38,8 +38,6 @@ char mqtt_pwd[40];             //WIFI config: MQTT server password (optional)
 
 String outputTopic;               //MQTT topic for sending messages
 String inputTopic1;                //MQTT topic for listening
-String inputTopic2;
-String inputTopic3;
 boolean mqttActive = true;
 char config_name[40];             //WIFI config: Bonjour name of device
 char config_rotation[40] = "false"; //WIFI config: Detault rotation is CCW
@@ -54,28 +52,12 @@ String msg;
 
 int set1;
 int pos1;
-int set2;
-int pos2;
-int set3;
-int pos3;
 
 int path1 = 0;                       //Direction of blind (1 = down, 0 = stop, -1 = up)
 int setPos1 = 0;                     //The set position 0-100% by the client
 
-int path2 = 0;                       //Direction of blind (1 = down, 0 = stop, -1 = up)
-int setPos2 = 0;
-
-int path3 = 0;                       //Direction of blind (1 = down, 0 = stop, -1 = up)
-int setPos3 = 0;
-
 long currentPosition1 = 0;
 long maxPosition1 = 100000;
-
-long currentPosition2 = 0;
-long maxPosition2 = 100000;
-
-long currentPosition3 = 0;
-long maxPosition3 = 100000;
 
 boolean loadDataSuccess = false;
 boolean saveItNow = false;          //If true will store positions to SPIFFS
@@ -83,10 +65,7 @@ bool shouldSaveConfig = false;      //Used for WIFI Manager callback to save par
 boolean initLoop = true;            //To enable actions first time the loop is run
 boolean ccw = true;                 //Turns counter clockwise to lower the curtain
 
-// Stepper_28BYJ_48 Stepper1(D1, D3, D2, D4); //Initiate stepper driver
-Stepper Stepper1(2048, D1, D2);
-Stepper Stepper2(2048, D3, D4);
-Stepper Stepper3(2048, D5, D6);
+Stepper_28BYJ_48 Stepper1(D1, D3, D2, D4); //Initiate stepper driver
 
 ESP8266WebServer server(80);              // TCP server at port 80 will respond to HTTP requests
 WebSocketsServer webSocket = WebSocketsServer(81);  // WebSockets will respond on port 81
@@ -103,10 +82,6 @@ bool loadConfig() {
   //Store variables locally
   currentPosition1 = root["currentPosition1"]; // 400
   maxPosition1 = root["maxPosition1"]; // 20000
-  currentPosition2 = root["currentPosition2"]; // 40000
-  maxPosition2 = root["maxPosition2"]; // 40000
-  currentPosition3 = root["currentPosition3"]; // 60000
-  maxPosition3 = root["maxPosition3"]; // 60000
   strcpy(config_name, root["config_name"]);
   strcpy(mqtt_server, root["mqtt_server"]);
   strcpy(mqtt_port, root["mqtt_port"]);
@@ -126,10 +101,6 @@ bool saveConfig() {
   JsonObject& json = jsonBuffer.createObject();
   json["currentPosition1"] = currentPosition1;
   json["maxPosition1"] = maxPosition1;
-  json["currentPosition2"] = currentPosition2;
-  json["maxPosition2"] = maxPosition2;
-  json["currentPosition3"] = currentPosition3;
-  json["maxPosition3"] = maxPosition3;
   json["config_name"] = config_name;
   json["mqtt_server"] = mqtt_server;
   json["mqtt_port"] = mqtt_port;
@@ -147,14 +118,8 @@ bool saveConfig() {
 void sendmsg(String topic) {
   set1 = (setPos1 * 100)/maxPosition1;
   pos1 = (currentPosition1 * 100)/maxPosition1;
-  set2 = (setPos2 * 100)/maxPosition2;
-  pos2 = (currentPosition2 * 100)/maxPosition2;
-  set3 = (setPos3 * 100)/maxPosition3;
-  pos3 = (currentPosition3 * 100)/maxPosition3;
     
-  msg = "{ \"set1\":"+String(set1)+", \"position1\":"+String(pos1)+", ";
-  msg += "\"set2\":"+String(set2)+", \"position2\":"+String(pos2)+", ";
-  msg += "\"set3\":"+String(set3)+", \"position3\":"+String(pos3)+" }";
+  msg = "{ \"set1\":"+String(set1)+", \"position1\":"+String(pos1)+" }";
   // Serial.println(msg);
   if (!mqttActive)
     return;
@@ -178,20 +143,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
       saveItNow = true;
       action1 = "manual";
     }
-    else if (motor_num == 2)
-    {
-      currentPosition2 = 0;
-      path2 = 0;
-      saveItNow = true;
-      action2 = "manual";
-    }
-    else if (motor_num == 3)
-    {
-      currentPosition3 = 0;
-      path3 = 0;
-      saveItNow = true;
-      action3 = "manual";
-    }
     
   } else if (command == "max") {
     /*
@@ -202,20 +153,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
       path1 = 0;
       saveItNow = true;
       action1 = "manual";
-    }
-    else if (motor_num == 2)
-    {
-      maxPosition2 = currentPosition2;
-      path2 = 0;
-      saveItNow = true;
-      action2 = "manual";
-    }
-    else if (motor_num == 3)
-    {
-      maxPosition3 = currentPosition3;
-      path3 = 0;
-      saveItNow = true;
-      action3 = "manual";
     }
 
   } else if (command == "manual" && value == "0") {
@@ -228,18 +165,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
       saveItNow = true;
       action1 = "manual";
     }
-    else if (motor_num == 2)
-    {
-      path2 = 0;
-      saveItNow = true;
-      action2 = "manual";
-    }
-    else if (motor_num == 3)
-    {
-      path3 = 0;
-      saveItNow = true;
-      action3 = "manual";
-    }
 
   } else if (command == "manual" && value == "1") {
     /*
@@ -249,16 +174,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
       path1 = 1;
       action1 = "manual";
     }
-    else if (motor_num == 2)
-    {
-      path2 = 1;
-      action2 = "manual";
-    }
-    else if (motor_num == 3)
-    {
-      path3 = 1;
-      action3 = "manual";
-    }
 
   } else if (command == "manual" && value == "-1") {
     /*
@@ -267,16 +182,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
     if (motor_num == 1) {
       path1 = -1;
       action1 = "manual";
-    }
-    else if (motor_num == 2)
-    {
-      path2 = -1;
-      action2 = "manual";
-    }
-    else if (motor_num == 3)
-    {
-      path3 = -1;
-      action3 = "manual";
     }
 
   } else if (command == "update") {
@@ -301,30 +206,6 @@ void processMsg(String command, String value, int motor_num, uint8_t clientnum){
 
       set1 = (setPos1 * 100)/maxPosition1;
       pos1 = (currentPosition1 * 100)/maxPosition1;
-
-      //Send the instruction to all connected devices
-      sendmsg(outputTopic);
-    }
-    else if (motor_num == 2)
-    {
-      path2 = maxPosition2 * value.toInt() / 100;
-      setPos2 = path2; //Copy path for responding to updates
-      action2 = "auto";
-
-      set2 = (setPos2 * 100)/maxPosition2;
-      pos2 = (currentPosition2 * 100)/maxPosition2;
-
-      //Send the instruction to all connected devices
-      sendmsg(outputTopic);
-    }
-    else if (motor_num == 3)
-    {
-      path3 = maxPosition3 * value.toInt() / 100;
-      setPos3 = path3; //Copy path for responding to updates
-      action3 = "auto";
-
-      set3 = (setPos3 * 100)/maxPosition3;
-      pos3 = (currentPosition3 * 100)/maxPosition3;
 
       //Send the instruction to all connected devices
       sendmsg(outputTopic);
@@ -404,10 +285,6 @@ void handleNotFound(){
 
 void setup(void)
 {
-  Stepper1.setSpeed(50);
-  Stepper2.setSpeed(50);
-  Stepper3.setSpeed(50);
-
   pinMode(D8, OUTPUT);
 
   Serial.begin(115200);
@@ -416,14 +293,10 @@ void setup(void)
 
   //Reset the action
   action1 = "";
-  action2 = "";
-  action3 = "";
 
   //Set MQTT properties
   outputTopic = helper.mqtt_gettopic("out");
   inputTopic1 = helper.mqtt_gettopic("in1");
-  inputTopic2 = helper.mqtt_gettopic("in2");
-  inputTopic3 = helper.mqtt_gettopic("in3");
 
   //Set the WIFI hostname
   WiFi.hostname(config_name);
@@ -490,10 +363,6 @@ void setup(void)
   if (!loadDataSuccess) {
     currentPosition1 = 0;
     maxPosition1 = 100000;
-    currentPosition2 = 0;
-    maxPosition2 = 100000;
-    currentPosition3 = 0;
-    maxPosition3 = 100000;
   }
 
   /*
@@ -595,7 +464,7 @@ void loop(void)
 
   //MQTT client
   if (mqttActive){
-    helper.mqtt_reconnect(psclient, mqtt_uid, mqtt_pwd, { inputTopic1.c_str(), inputTopic2.c_str(), inputTopic3.c_str() });
+    helper.mqtt_reconnect(psclient, mqtt_uid, mqtt_pwd, { inputTopic1.c_str() });
   }
 
 
@@ -638,62 +507,6 @@ void loop(void)
     currentPosition1 = currentPosition1 + path1;
   }
 
-  if (action2 == "auto") {
-    /*
-       Automatically open or close blind
-    */
-    if (currentPosition2 > path2){
-      Stepper2.step(ccw ? -1: 1);
-      currentPosition2 = currentPosition2 - 1;
-    } else if (currentPosition2 < path2){
-      Stepper2.step(ccw ? 1 : -1);
-      currentPosition2 = currentPosition2 + 1;
-    } else {
-      path2 = 0;
-      action2 = "";
-      set2 = (setPos2 * 100)/maxPosition2;
-      pos2 = (currentPosition2 * 100)/maxPosition2;
-      sendmsg(outputTopic);
-      Serial.println("Stopped 2. Reached wanted position");
-      saveItNow = true;
-    }
-
- } else if (action2 == "manual" && path2 != 0) {
-    /*
-       Manually running the blind
-    */
-    Stepper2.step(ccw ? path2 : -path2);
-    currentPosition2 = currentPosition2 + path2;
-  }
-
-  if (action3 == "auto") {
-    /*
-       Automatically open or close blind
-    */
-    if (currentPosition3 > path3){
-      Stepper3.step(ccw ? -1: 1);
-      currentPosition3 = currentPosition3 - 1;
-    } else if (currentPosition3 < path3){
-      Stepper3.step(ccw ? 1 : -1);
-      currentPosition3 = currentPosition3 + 1;
-    } else {
-      path3 = 0;
-      action3 = "";
-      set3 = (setPos3 * 100)/maxPosition3;
-      pos3 = (currentPosition3 * 100)/maxPosition3;
-      sendmsg(outputTopic);
-      Serial.println("Stopped 3. Reached wanted position");
-      saveItNow = true;
-    }
-
-  } else if (action3 == "manual" && path3 != 0) {
-    /*
-       Manually running the blind
-    */
-    Stepper3.step(ccw ? path3 : -path3);
-    currentPosition3 = currentPosition3 + path3;
-  }
-
   /*
      After running setup() the motor might still have
      power on some of the coils. This is making sure that
@@ -701,7 +514,7 @@ void loop(void)
      to avoid heating the stepper motor draining
      unnecessary current
   */
-  if (action1 != "" || action2 != "" || action3 != "") {
+  if (action1 != "") {
     // Running mode
     long now = millis();
     if (now - lastPublish > 1000) {
