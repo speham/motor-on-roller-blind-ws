@@ -5,8 +5,8 @@ String INDEX_HTML = R"(<!DOCTYPE html>
   <meta http-equiv='Pragma' content='no-cache' />
   <meta http-equiv='Expires' content='0' />
   <title>{NAME}</title>
-  <link rel='stylesheet' href='https://unpkg.com/onsenui/css/onsenui.min.css'>
-  <link rel='stylesheet' href='https://unpkg.com/onsenui/css/dark-onsen-css-components.min.css'>
+  <link rel='stylesheet' href='https://unpkg.com/onsenui/css/onsenui.css'>
+  <link rel='stylesheet' href='https://unpkg.com/onsenui/css/onsen-css-components.min.css'>
   <script src='https://unpkg.com/onsenui/js/onsenui.min.js'></script>
   <script src='https://unpkg.com/jquery/dist/jquery.min.js'></script>
   <script>
@@ -33,7 +33,7 @@ String INDEX_HTML = R"(<!DOCTYPE html>
 
   var setActions = function(){
     doSend('{"action": "update"}');
-    $.get('https://api.github.com/repos/daandeve/'+repo+'/releases', function(data){
+    $.get('https://api.github.com/repos/speham/'+repo+'/releases', function(data){
       if (data.length>0 && data[0].tag_name !== cversion){
         $('#cversion').text(cversion);
         $('#nversion').text(data[0].tag_name);
@@ -218,12 +218,12 @@ String INDEX_HTML = R"(<!DOCTYPE html>
   </ons-card>
 <!-- ---------------------1 -->
   <ons-card>
-    <div class='title'>Main Blind</div>
+    <div class='title'>Blind 1</div>
     <ons-row style='width:100%'>
       <ons-col style='text-align:center'><ons-icon id='arrow-up-man1' icon='fa-arrow-up' size='2x'></ons-icon></ons-col>
       <ons-col style='text-align:center'><ons-icon id='arrow-stop-man1' icon='fa-stop' size='2x'></ons-icon></ons-col>
       <ons-col style='text-align:center'><ons-icon id='arrow-down-man1' icon='fa-arrow-down' size='2x'></ons-icon></ons-col>
-    <ons-row style='width:100%;margin-top: 30px;'>
+    <ons-row style='width:100%'>
       <ons-col style='text-align:center'><ons-button id='set-start1'>Set Start</ons-button></ons-col>
       <ons-col style='text-align:center'>&nbsp;</ons-col>
       <ons-col style='text-align:center'><ons-button id='set-max1'>Set Max</ons-button></ons-col>
@@ -252,7 +252,7 @@ String INDEX_HTML = R"(<!DOCTYPE html>
         <li>3d print files and instructions: <a href='https://www.thingiverse.com/thing:2392856' style="color: orange;" target='_blank'>https://www.thingiverse.com/thing:2392856</a></li>
         <li>Original Repo from: <a href='https://github.com/nidayand/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/nidayand/motor-on-roller-blind-ws</a></li>
         <li>Forked from: <a href='https://github.com/jnt2007/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/jnt2007/motor-on-roller-blind-ws</a></li>
-        <li>Current fork on Github: <a href='https://github.com/Daandeve/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/Daandeve/motor-on-roller-blind-ws</a></li>
+        <li>Current fork on Github: <a href='https://github.com/speham/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/speham/motor-on-roller-blind-ws</a></li>
         <li>Licensed under <a href='https://raw.githubusercontent.com/nidayand/motor-on-roller-blind-ws/master/LICENSE' style="color: orange;"  target='_blank'>MIT License</a></li>
       </ul>
     </p>

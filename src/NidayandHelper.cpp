@@ -132,6 +132,11 @@ void NidayandHelper::resetsettings(WiFiManager &wifim) {
   wifim.resetSettings();
   delay(500);
   SPIFFS.format();
-  Serial.println("Settings cleared");
+  Serial.println("Settings cleared"); 
+  WiFi.disconnect();
+  delay(3000);
+
+  ESP.eraseConfig();
   ESP.reset();
+  ESP.restart();
 }

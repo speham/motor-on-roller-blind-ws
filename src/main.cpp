@@ -19,7 +19,7 @@
 //--------------- CHANGE PARAMETERS ------------------
 // Configure Default Settings for Access Point logon
 // Name of access point
-String APid = "BlindsConnectAP";
+String APid = "Rollerblind";
 // Password for access point
 String APpw = "123456789";
 
