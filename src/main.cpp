@@ -21,7 +21,7 @@
 // Name of access point
 String APid = "BlindsConnectAP";
 // Password for access point
-String APpw = "CTGkePRCZILzIIhv";
+String APpw = "123456789";
 
 //----------------------------------------------------
 
@@ -84,7 +84,7 @@ boolean initLoop = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-Stepper_28BYJ_48 Stepper1(D1, D3, D2, D4); // Initiate stepper driver
+Stepper_28BYJ_48 Stepper1(D1, D2, D3, D4); // Initiate stepper driver
 // CheapStepper stepper(D1, D3, D2, D4);
 
 // TCP server at port 80 will respond to HTTP requests
@@ -403,17 +403,17 @@ void setup(void) {
   /*
     Setup multi DNS (Bonjour)
     */
-  if (MDNS.begin(config_name)) {
-    Serial.println("MDNS responder started");
-    MDNS.addService("http", "tcp", 80);
-    MDNS.addService("ws", "tcp", 81);
-
-  } else {
-    Serial.println("Error setting up MDNS responder!");
-    while (1) {
-      delay(1000);
-    }
-  }
+ // if (MDNS.begin(config_name)) {
+ //   Serial.println("MDNS responder started");
+ //   MDNS.addService("http", "tcp", 80);
+ //   MDNS.addService("ws", "tcp", 81);
+//
+ // } else {
+ //   Serial.println("Error setting up MDNS responder!");
+ //   while (1) {
+ //     delay(1000);
+ //   }
+ // }
   Serial.print("Connect to http://" + String(config_name) +
                ".local or http://");
   Serial.println(WiFi.localIP());

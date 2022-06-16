@@ -58,7 +58,7 @@ boolean NidayandHelper::saveconfig(JsonVariant json) {
 }
 
 String NidayandHelper::mqtt_gettopic(String type) {
-  return "/raw/esp8266/" + String(ESP.getChipId()) + "/" + type;
+  return "Schlafzimmer/Rolladen/raw/esp8266/" + String(ESP.getChipId()) + "/" + type;
 }
 
 void NidayandHelper::mqtt_reconnect(PubSubClient &psclient) {
@@ -90,7 +90,7 @@ void NidayandHelper::mqtt_reconnect(PubSubClient &psclient, String uid,
       Serial.println("connected");
 
       // Send register MQTT message with JSON of chipid and ip-address
-      this->mqtt_publish(psclient, "/raw/esp8266/register",
+      this->mqtt_publish(psclient, "Schlafzimmer/Rolladen/raw/esp8266/register",
                          "{ \"id\": \"" + String(ESP.getChipId()) +
                              "\", \"ip\":\"" + WiFi.localIP().toString() +
                              "\"}");
