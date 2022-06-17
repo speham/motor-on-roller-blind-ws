@@ -27,7 +27,7 @@ String APpw = "123456789";
 
 // Version number for checking if there are new code releases and notifying the
 // user
-String version = "1.4.0";
+String version = "1.4.1";
 
 NidayandHelper helper = NidayandHelper();
 
@@ -65,6 +65,9 @@ String msg;
 
 int set1;
 int pos1;
+
+bool isMoving;  
+long lastMsgPosSend = 0;
 
 // Direction of blind (1 = down, 0 = stop, -1 = up)
 int path1 = 0;
@@ -527,11 +530,14 @@ void loop(void) {
     */
     if (currentPosition1 > path1) {
       Stepper1.step(ccw ? -1 : 1);
+      isMoving = true;
       currentPosition1 = currentPosition1 - 1;
     } else if (currentPosition1 < path1) {
       Stepper1.step(ccw ? 1 : -1);
       currentPosition1 = currentPosition1 + 1;
+      isMoving = true;
     } else {
+      isMoving = false;
       path1 = 0;
       action1 = "";
       set1 = (setPos1 * 100) / maxPosition1;
@@ -540,7 +546,12 @@ void loop(void) {
       Serial.println("Stopped 1. Reached wanted position");
       saveItNow = true;
     }
-
+    if (isMoving && ((((currentPosition1 * 100) / maxPosition1) > lastMsgPosSend) || (((currentPosition1 * 100) / maxPosition1) < lastMsgPosSend)))
+    {
+     lastMsgPosSend = ((currentPosition1 * 100) / maxPosition1);
+     sendmsg(outputTopic);
+    }
+    
   } else if (action1 == "manual" && path1 != 0) {
     /*
        Manually running the blind
