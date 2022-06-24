@@ -87,7 +87,7 @@ boolean initLoop = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-Stepper_28BYJ_48 Stepper1(D1, D2, D3, D4); // Initiate stepper driver
+Stepper_28BYJ_48 Stepper1(14, 12, 13, 15); // Initiate stepper driver
 // CheapStepper stepper(D1, D3, D2, D4);
 
 // TCP server at port 80 will respond to HTTP requests
@@ -303,10 +303,18 @@ void handleNotFound() {
 }
 
 void stopPowerToCoils() {
-  digitalWrite(D1, LOW);
-  digitalWrite(D2, LOW);
-  digitalWrite(D3, LOW);
-  digitalWrite(D4, LOW);
+  digitalWrite(14, LOW);
+  digitalWrite(12, LOW);
+  digitalWrite(13, LOW);
+  digitalWrite(15, LOW);
+}
+
+void DisableLeds()
+{
+  pinMode(2, OUTPUT); 
+  digitalWrite(2, HIGH);
+  pinMode(16, OUTPUT); 
+  digitalWrite(16, HIGH);
 }
 
 void setup(void) {
@@ -485,6 +493,7 @@ void setup(void) {
     ArduinoOTA.begin();
   }
   ESP.wdtDisable();
+  DisableLeds();
 }
 
 void loop(void) {
