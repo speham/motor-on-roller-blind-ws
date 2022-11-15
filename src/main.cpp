@@ -27,7 +27,7 @@ String APpw = "123456789";
 
 // Version number for checking if there are new code releases and notifying the
 // user
-String version = "1.4.1";
+String version = "1.4.2";
 
 NidayandHelper helper = NidayandHelper();
 
@@ -87,8 +87,11 @@ boolean initLoop = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-Stepper_28BYJ_48 Stepper1(14, 12, 13, 15); // Initiate stepper driver
-// CheapStepper stepper(D1, D3, D2, D4);
+#define MotorStepPin    D2 
+#define MotorDirPin     D1 
+#define MotorEnablePin  D5 
+#include <AccelStepper.h>
+AccelStepper Stepper1(AccelStepper::DRIVER, MotorStepPin, MotorDirPin);
 
 // TCP server at port 80 will respond to HTTP requests
 ESP8266WebServer server(80);
@@ -106,6 +109,7 @@ bool loadConfig() {
 
   // Store variables locally
   currentPosition1 = root["currentPosition1"]; // 400
+  Stepper1.setCurrentPosition(currentPosition1);
   maxPosition1 = root["maxPosition1"];         // 20000
   strcpy(config_name, root["config_name"]);
   strcpy(mqtt_server, root["mqtt_server"]);
@@ -275,7 +279,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
   if (res == "update" || res == "ping") {
     processMsg(res, "", NULL, NULL);
   } else
-    processMsg("auto", res, motor_id, NULL);
+    processMsg("auto", res, motor_id, NULL); 
 }
 
 /*
@@ -302,11 +306,24 @@ void handleNotFound() {
   server.send(404, "text/plain", message);
 }
 
-void stopPowerToCoils() {
-  digitalWrite(14, LOW);
-  digitalWrite(12, LOW);
-  digitalWrite(13, LOW);
-  digitalWrite(15, LOW);
+void motorDisable()
+{
+  digitalWrite(MotorEnablePin, HIGH);
+}
+
+void motorEnable()
+{
+  digitalWrite(MotorEnablePin, LOW);
+}
+
+void motorSetup()
+{
+  pinMode(MotorEnablePin, OUTPUT);
+  motorDisable();
+  
+  Stepper1.setMaxSpeed(100000);
+  Stepper1.setAcceleration(100000);
+  Stepper1.setSpeed(100000);
 }
 
 void DisableLeds()
@@ -397,7 +414,7 @@ void setup(void) {
     // Save the data
     saveConfig();
   }
-
+  motorSetup();
   /*
      Try to load FS data configuration every time when
      booting up. If loading does not work, set the default
@@ -409,6 +426,7 @@ void setup(void) {
   if (!loadDataSuccess) {
     currentPosition1 = 0;
     maxPosition1 = 100000;
+    Stepper1.setCurrentPosition(currentPosition1);
   }
 
   /*
@@ -527,7 +545,7 @@ void loop(void) {
       turn off all coils to avoid overheating and less energy
       consumption
     */
-    stopPowerToCoils();
+    motorDisable();
   }
 
   /**
@@ -537,12 +555,13 @@ void loop(void) {
     /*
        Automatically open or close blind
     */
+    motorEnable();
     if (currentPosition1 > path1) {
-      Stepper1.step(ccw ? -1 : 1);
+      Stepper1.move(ccw ? -1 : 1);
       isMoving = true;
       currentPosition1 = currentPosition1 - 1;
     } else if (currentPosition1 < path1) {
-      Stepper1.step(ccw ? 1 : -1);
+      Stepper1.move(ccw ? 1 : -1);
       currentPosition1 = currentPosition1 + 1;
       isMoving = true;
     } else {
@@ -565,10 +584,18 @@ void loop(void) {
     /*
        Manually running the blind
     */
-    Stepper1.step(ccw ? path1 : -path1);
+    motorEnable();
+    Stepper1.move(ccw ? path1 : -path1);
     currentPosition1 = currentPosition1 + path1;
   }
 
+  
+  while (Stepper1.distanceToGo() != 0)
+  {
+    Stepper1.run();
+    delay(0); // wdt reset 
+  }
+  
   /*
      After running setup() the motor might still have
      power on some of the coils. This is making sure that
@@ -578,6 +605,6 @@ void loop(void) {
   */
   if (initLoop) {
     initLoop = false;
-    stopPowerToCoils();
+    motorDisable();
   }
 }
