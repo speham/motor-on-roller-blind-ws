@@ -63,10 +63,10 @@ long lastPublish = 0;
 String action1;
 String msg;
 
-int set1;
+int targetPosition;
 int pos1;
 
-bool isMoving;  
+bool isMoving = false;  
 long lastMsgPosSend = 0;
 
 // Direction of blind (1 = down, 0 = stop, -1 = up)
@@ -74,7 +74,7 @@ int path1 = 0;
 // The set position 0-100% by the client
 int setPos1 = 0;
 
-long currentPosition1 = 0;
+long actualPosition = 0;
 long maxPosition1 = 100000;
 
 boolean loadDataSuccess = false;
@@ -108,8 +108,8 @@ bool loadConfig() {
   Serial.println();
 
   // Store variables locally
-  currentPosition1 = root["currentPosition1"]; // 400
-  Stepper1.setCurrentPosition(currentPosition1);
+  actualPosition = root["actualPosition"]; // 400
+  Stepper1.setCurrentPosition(actualPosition);
   maxPosition1 = root["maxPosition1"];         // 20000
   strcpy(config_name, root["config_name"]);
   strcpy(mqtt_server, root["mqtt_server"]);
@@ -128,7 +128,7 @@ bool saveConfig() {
   const size_t capacity = JSON_OBJECT_SIZE(12);
   DynamicJsonBuffer jsonBuffer(capacity);
   JsonObject &json = jsonBuffer.createObject();
-  json["currentPosition1"] = currentPosition1;
+  json["actualPosition"] = actualPosition;
   json["maxPosition1"] = maxPosition1;
   json["config_name"] = config_name;
   json["mqtt_server"] = mqtt_server;
@@ -145,10 +145,10 @@ bool saveConfig() {
    Finally, close down the connection and radio
 */
 void sendmsg(String topic) {
-  set1 = (setPos1 * 100) / maxPosition1;
-  pos1 = (currentPosition1 * 100) / maxPosition1;
+  targetPosition = (setPos1 * 100) / maxPosition1;
+  pos1 = (actualPosition * 100) / maxPosition1;
 
-  msg = "{ \"set1\":" + String(set1) + ", \"position1\":" + String(pos1) + " }";
+  msg = "{ \"targetPosition\":" + String(targetPosition) + ", \"position1\":" + String(pos1) + " }";
   // Serial.println(msg);
   if (!mqttActive)
     return;
@@ -168,7 +168,7 @@ void processMsg(String command, String value, int motor_num,
        Store the current position as the start position
     */
     if (motor_num == 1) {
-      currentPosition1 = 0;
+      actualPosition = 0;
       path1 = 0;
       saveItNow = true;
       action1 = "manual";
@@ -179,7 +179,7 @@ void processMsg(String command, String value, int motor_num,
        Store the max position of a closed blind
     */
     if (motor_num == 1) {
-      maxPosition1 = currentPosition1;
+      maxPosition1 = actualPosition;
       path1 = 0;
       saveItNow = true;
       action1 = "manual";
@@ -234,8 +234,8 @@ void processMsg(String command, String value, int motor_num,
       setPos1 = path1; // Copy path for responding to updates
       action1 = "auto";
 
-      set1 = (setPos1 * 100) / maxPosition1;
-      pos1 = (currentPosition1 * 100) / maxPosition1;
+      targetPosition = (setPos1 * 100) / maxPosition1;
+      pos1 = (actualPosition * 100) / maxPosition1;
 
       // Send the instruction to all connected devices
       sendmsg(outputTopic);
@@ -313,17 +313,24 @@ void motorDisable()
 
 void motorEnable()
 {
-  digitalWrite(MotorEnablePin, LOW);
+  //if (!Stepper1.isRunning())  not working as only 1 step is done per loop
+  //{
+    digitalWrite(MotorEnablePin, LOW);
+  //  Serial.print("Motor enabled\n");
+  //  delay(2);
+  //}  
 }
 
 void motorSetup()
 {
+  int rpm = 3000;
+
   pinMode(MotorEnablePin, OUTPUT);
   motorDisable();
-  
-  Stepper1.setMaxSpeed(100000);
-  Stepper1.setAcceleration(100000);
-  Stepper1.setSpeed(100000);
+  Stepper1.setMinPulseWidth(20);
+  Stepper1.setMaxSpeed(rpm);
+  Stepper1.setAcceleration(rpm/4);
+  Stepper1.setSpeed(rpm);
 }
 
 void DisableLeds()
@@ -424,9 +431,9 @@ void setup(void) {
   loadDataSuccess = loadConfig();
   Serial.println("Config loaded");
   if (!loadDataSuccess) {
-    currentPosition1 = 0;
+    actualPosition = 0;
     maxPosition1 = 100000;
-    Stepper1.setCurrentPosition(currentPosition1);
+    Stepper1.setCurrentPosition(actualPosition);
   }
 
   /*
@@ -554,46 +561,70 @@ void loop(void) {
   if (action1 == "auto") {
     /*
        Automatically open or close blind
-    */
-    motorEnable();
-    if (currentPosition1 > path1) {
-      Stepper1.move(ccw ? -1 : 1);
-      isMoving = true;
-      currentPosition1 = currentPosition1 - 1;
-    } else if (currentPosition1 < path1) {
-      Stepper1.move(ccw ? 1 : -1);
-      currentPosition1 = currentPosition1 + 1;
-      isMoving = true;
-    } else {
+    */    
+    actualPosition = Stepper1.currentPosition();
+    //targetPosition = (setPos1 * 100) / maxPosition1;
+
+    if (actualPosition != path1 && !isMoving) {
+        motorEnable();
+        Serial.print("Moving to ");
+        Serial.print(setPos1);
+        Serial.print(" inc ");
+        Serial.print(targetPosition);
+        Serial.print(" from ");
+        Serial.println(actualPosition);
+        Serial.print(" path ");
+        Serial.println(path1);
+        Stepper1.moveTo(ccw ? path1 : -path1);
+        isMoving = true;
+    } else if (actualPosition == path1){
       isMoving = false;
       path1 = 0;
       action1 = "";
-      set1 = (setPos1 * 100) / maxPosition1;
-      pos1 = (currentPosition1 * 100) / maxPosition1;
+      targetPosition = (setPos1 * 100) / maxPosition1;
+      pos1 = (actualPosition * 100) / maxPosition1;
       sendmsg(outputTopic);
+      
+        Serial.print("actual pos ");
+        Serial.print(actualPosition);
+        Serial.print(" target ");
+        Serial.println(targetPosition);
+      
       Serial.println("Stopped 1. Reached wanted position");
       saveItNow = true;
     }
-    if (isMoving && ((((currentPosition1 * 100) / maxPosition1) > lastMsgPosSend) || (((currentPosition1 * 100) / maxPosition1) < lastMsgPosSend)))
+
+    if (isMoving && ((((actualPosition * 100) / maxPosition1) > lastMsgPosSend+5) || (((actualPosition * 100) / maxPosition1) < lastMsgPosSend-5)))
     {
-     lastMsgPosSend = ((currentPosition1 * 100) / maxPosition1);
+     lastMsgPosSend = ((actualPosition * 100) / maxPosition1);
      sendmsg(outputTopic);
+     
     }
+
     
-  } else if (action1 == "manual" && path1 != 0) {
+  } else if (action1 == "manual" ) {
     /*
        Manually running the blind
     */
-    motorEnable();
-    Stepper1.move(ccw ? path1 : -path1);
-    currentPosition1 = currentPosition1 + path1;
+    if (path1 != 0)
+    {
+      motorEnable();
+      Stepper1.move(ccw ? path1 : -path1);
+      actualPosition = Stepper1.currentPosition();//actualPosition + path1;
+    }
+    else
+    {
+      Stepper1.stop();
+    }
   }
 
   
-  while (Stepper1.distanceToGo() != 0)
+  if (Stepper1.distanceToGo() != 0)
   {
+    
+    //Stepper1.run();
+    //Stepper1.setAcceleration(2000);    
     Stepper1.run();
-    delay(0); // wdt reset 
   }
   
   /*
