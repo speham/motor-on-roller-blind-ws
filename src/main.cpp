@@ -194,6 +194,7 @@ void processMsg(String command, String value, int motor_num,
       path1 = 0;
       saveItNow = true;
       action1 = "manual";
+      Stepper1.setAcceleration(200000);
     }
 
   } else if (command == "manual" && value == "1") {
@@ -212,6 +213,7 @@ void processMsg(String command, String value, int motor_num,
     if (motor_num == 1) {
       path1 = -1;
       action1 = "manual";
+      Stepper1.setAcceleration(200000);
     }
 
   } else if (command == "update") {
@@ -239,6 +241,8 @@ void processMsg(String command, String value, int motor_num,
 
       // Send the instruction to all connected devices
       sendmsg(outputTopic);
+      Stepper1.setAcceleration(300);
+
     }
   }
 }
@@ -323,13 +327,13 @@ void motorEnable()
 
 void motorSetup()
 {
-  int rpm = 3000;
+  int rpm = 1500; //2500
 
   pinMode(MotorEnablePin, OUTPUT);
   motorDisable();
   Stepper1.setMinPulseWidth(20);
   Stepper1.setMaxSpeed(rpm);
-  Stepper1.setAcceleration(rpm/4);
+  Stepper1.setAcceleration(300);
   Stepper1.setSpeed(rpm);
 }
 
@@ -554,6 +558,8 @@ void loop(void) {
     */
     motorDisable();
   }
+  
+  actualPosition = Stepper1.currentPosition();
 
   /**
     Manage actions. Steering of the blind
@@ -562,7 +568,6 @@ void loop(void) {
     /*
        Automatically open or close blind
     */    
-    actualPosition = Stepper1.currentPosition();
     //targetPosition = (setPos1 * 100) / maxPosition1;
 
     if (actualPosition != path1 && !isMoving) {
@@ -610,7 +615,6 @@ void loop(void) {
     {
       motorEnable();
       Stepper1.move(ccw ? path1 : -path1);
-      actualPosition = Stepper1.currentPosition();//actualPosition + path1;
     }
     else
     {
@@ -621,9 +625,6 @@ void loop(void) {
   
   if (Stepper1.distanceToGo() != 0)
   {
-    
-    //Stepper1.run();
-    //Stepper1.setAcceleration(2000);    
     Stepper1.run();
   }
   
