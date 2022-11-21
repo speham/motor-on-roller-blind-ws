@@ -45,6 +45,8 @@ String INDEX_HTML = R"(<!DOCTYPE html>
       $('#arrow-close1').on('click', function(){$('#setrange1').val(100);gotoPos('{"id": 1, "action": "auto", "value": 100}');});
       $('#arrow-open1').on('click', function(){$('#setrange1').val(0);gotoPos('{"id": 1, "action": "auto", "value": 0}');});
       $('#setrange1').on('change', function(){gotoPos('{"id": 1, "action": "auto", "value": ' + $('#setrange1').val() + '}')});
+      
+      $('#setspeed').on('change', function(){doSend('{"id": 1, "action": "setspeed", "value": ' + $('#setspeed').val() + '}')});
 
       $('#arrow-up-man1').on('click', function(){doSend('{"id": 1, "action": "manual", "value": -1}')});
       $('#arrow-down-man1').on('click', function(){doSend('{"id": 1, "action": "manual", "value": 1}')});
@@ -85,12 +87,17 @@ String INDEX_HTML = R"(<!DOCTYPE html>
       websocket.onmessage = function(evt) {
         try{
           var msg = JSON.parse(evt.data);
+          console.log(msg);
+
           if (typeof msg.position1 !== 'undefined'){
             $('#pbar1').attr('value', msg.position1);
           };
           if (typeof msg.set1 !== 'undefined'){
             $('#setrange1').val(msg.set1);
-            $('#setrange1').attr('value', msg.position1);
+            $('#setrange1').attr('value', msg.set1);
+          };
+          if (typeof msg.speed1 !== 'undefined'){
+            $('#setspeed').attr('value', msg.speed1);
           };
         } catch(err){}
       };
@@ -171,21 +178,43 @@ String INDEX_HTML = R"(<!DOCTYPE html>
         </ons-col>
     </ons-row>
     <ons-row>
-        <ons-col width='40px' style='text-align: center; line-height: 31px;'>
-        <ons-icon id='arrow-open1' icon='fa-arrow-up' size='2x'></ons-icon>
-        </ons-col>
-        <ons-col>
-        <ons-range id='setrange1' style='width: 100%;' value='0'></ons-range>
-        </ons-col>
-        <ons-col width='40px' style='text-align: center; line-height: 31px;'>
-        <ons-icon id='arrow-close1' icon='fa-arrow-down' size='2x'></ons-icon>
-        </ons-col>
+      <ons-col width='40px' style='text-align: center; line-height: 31px;'>
+      <ons-icon id='arrow-open1' icon='fa-arrow-up' size='2x'></ons-icon>
+      </ons-col>
+      <ons-col>
+      <ons-range id='setrange1' style='width: 100%;' value='0'></ons-range>
+      </ons-col>
+      <ons-col width='40px' style='text-align: center; line-height: 31px;'>
+      <ons-icon id='arrow-close1' icon='fa-arrow-down' size='2x'></ons-icon>
+      </ons-col>
     </ons-row>
+   </ons-card>
 
-    </ons-card>
+   <ons-card>
+    <div class='title'>Setup Speed</div>
+    <div class='content'><p></p></div>
+    <!-- --------------------settings -->
+    <ons-row>
+      <ons-col width='50%' style='text-align: left; line-height: 60px;'>Window sensor
+        <ons-icon id='button-sw1' icon='fa-circle' size='2x'></ons-icon>
+      </ons-col>
+    </ons-row>
+    <ons-row>
+      <ons-col width='40px' style='text-align: center; line-height: 31px;'>
+        <ons-icon id='icon-setsetspeed' icon='fa-tachometer' size='2x'></ons-icon>
+      </ons-col>
+      <ons-col>
+        <ons-range id='setspeed' style='width: 100%;' value='20'></ons-range>
+      </ons-col>
+        <ons-col width='40px' style='text-align: left; line-height: 31px;'>%
+      </ons-col>
+    </ons-row>
+  </ons-card>
+
+
     <ons-card id='update-card' style='display:none'>
       <div class='title'>Update available</div>
-      <div class='content'>You are running <span id='cversion'></span> and <span id='nversion'></span> is the latest. Go to <a href='https://github.com/nidayand/motor-on-roller-blind-ws/releases'>the repo</a> to download</div>
+      <div class='content'>You are running <span id='cversion'></span> and <span id='nversion'></span> is the latest. Go to <a href='https://github.com/speham/motor-on-roller-blind-ws/releases'>the repo</a> to download</div>
     </ons-card>
   </ons-page>
 </template>
@@ -218,7 +247,7 @@ String INDEX_HTML = R"(<!DOCTYPE html>
   </ons-card>
 <!-- ---------------------1 -->
   <ons-card>
-    <div class='title'>Blind 1</div>
+    <div class='title'>Main Blind</div>
     <ons-row style='width:100%'>
       <ons-col style='text-align:center'><ons-icon id='arrow-up-man1' icon='fa-arrow-up' size='2x'></ons-icon></ons-col>
       <ons-col style='text-align:center'><ons-icon id='arrow-stop-man1' icon='fa-stop' size='2x'></ons-icon></ons-col>
@@ -249,11 +278,10 @@ String INDEX_HTML = R"(<!DOCTYPE html>
     <div class='content'>
     <p>
       <ul>
-        <li>3d print files and instructions: <a href='https://www.thingiverse.com/thing:2392856' style="color: orange;" target='_blank'>https://www.thingiverse.com/thing:2392856</a></li>
-        <li>Original Repo from: <a href='https://github.com/nidayand/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/nidayand/motor-on-roller-blind-ws</a></li>
-        <li>Forked from: <a href='https://github.com/jnt2007/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/jnt2007/motor-on-roller-blind-ws</a></li>
-        <li>Current fork on Github: <a href='https://github.com/speham/motor-on-roller-blind-ws' style="color: orange;"  target='_blank'>https://github.com/speham/motor-on-roller-blind-ws</a></li>
-        <li>Licensed under <a href='https://raw.githubusercontent.com/nidayand/motor-on-roller-blind-ws/master/LICENSE' style="color: orange;"  target='_blank'>MIT License</a></li>
+        <li>3d print files and instructions: <a href='https://www.thingiverse.com/thing:2392856' target='_blank'>https://www.thingiverse.com/thing:2392856</a></li>
+        <li>Forked from: <a href='https://github.com/nidayand/motor-on-roller-blind-ws' target='_blank'>https://github.com/nidayand/motor-on-roller-blind-ws</a></li>
+        <li>Current fork on Github: <a href='https://github.com/speham/motor-on-roller-blind-ws' target='_blank'>https://github.com/speham/motor-on-roller-blind-ws</a></li>
+        <li>Licensed under <a href='https://raw.githubusercontent.com/nidayand/motor-on-roller-blind-ws/master/LICENSE' target='_blank'>MIT License</a></li>
       </ul>
     </p>
   </div>

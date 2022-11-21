@@ -63,8 +63,9 @@ long lastPublish = 0;
 String action1;
 String msg;
 
-int targetPosition;
+int set1;
 int pos1;
+int speed1 = 1500;
 
 bool isMoving = false;  
 long lastMsgPosSend = 0;
@@ -145,10 +146,11 @@ bool saveConfig() {
    Finally, close down the connection and radio
 */
 void sendmsg(String topic) {
-  targetPosition = (setPos1 * 100) / maxPosition1;
+  set1 = (setPos1 * 100) / maxPosition1;
   pos1 = (actualPosition * 100) / maxPosition1;
+  int mappedspeed1 = map(speed1,0,2500,0,100);
 
-  msg = "{ \"targetPosition\":" + String(targetPosition) + ", \"position1\":" + String(pos1) + " }";
+  msg = "{ \"set1\":" + String(set1) + ", \"position1\":" + String(pos1) + ", \"speed1\":" + String(mappedspeed1) + " }";
   // Serial.println(msg);
   if (!mqttActive)
     return;
@@ -183,6 +185,18 @@ void processMsg(String command, String value, int motor_num,
       path1 = 0;
       saveItNow = true;
       action1 = "manual";
+    }
+  } else if (command == "setspeed") {
+    /*
+       set speed for movement
+    */
+    if (motor_num == 1) {
+      speed1 = map(value.toInt(),0,100,100,2500);
+      Stepper1.setSpeed(speed1);
+      Stepper1.setMaxSpeed(speed1);
+      Serial.print("Motorspeed set to [");
+      Serial.print(speed1);
+      Serial.print("] ");
     }
 
   } else if (command == "manual" && value == "0") {
@@ -219,7 +233,8 @@ void processMsg(String command, String value, int motor_num,
   } else if (command == "update") {
     // Send position details to client
     sendmsg(outputTopic);
-    webSocket.sendTXT(clientnum, msg);
+    
+    //webSocket.sendTXT(clientnum, msg);
 
   } else if (command == "ping") {
     // Do nothing
@@ -236,7 +251,7 @@ void processMsg(String command, String value, int motor_num,
       setPos1 = path1; // Copy path for responding to updates
       action1 = "auto";
 
-      targetPosition = (setPos1 * 100) / maxPosition1;
+      set1 = (setPos1 * 100) / maxPosition1;
       pos1 = (actualPosition * 100) / maxPosition1;
 
       // Send the instruction to all connected devices
@@ -568,14 +583,14 @@ void loop(void) {
     /*
        Automatically open or close blind
     */    
-    //targetPosition = (setPos1 * 100) / maxPosition1;
+    //set1 = (setPos1 * 100) / maxPosition1;
 
     if (actualPosition != path1 && !isMoving) {
         motorEnable();
         Serial.print("Moving to ");
         Serial.print(setPos1);
         Serial.print(" inc ");
-        Serial.print(targetPosition);
+        Serial.print(set1);
         Serial.print(" from ");
         Serial.println(actualPosition);
         Serial.print(" path ");
@@ -586,14 +601,14 @@ void loop(void) {
       isMoving = false;
       path1 = 0;
       action1 = "";
-      targetPosition = (setPos1 * 100) / maxPosition1;
+      set1 = (setPos1 * 100) / maxPosition1;
       pos1 = (actualPosition * 100) / maxPosition1;
       sendmsg(outputTopic);
       
         Serial.print("actual pos ");
         Serial.print(actualPosition);
         Serial.print(" target ");
-        Serial.println(targetPosition);
+        Serial.println(set1);
       
       Serial.println("Stopped 1. Reached wanted position");
       saveItNow = true;
