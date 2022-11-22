@@ -63,11 +63,9 @@ long lastPublish = 0;
 String action1;
 String msg;
 
-int set1;
-int pos1;
-int speed1 = 1500;
+int set1, pos1, speed1;
+bool switch1, switch2 = false;
 
-bool isMoving = false;  
 long lastMsgPosSend = 0;
 
 // Direction of blind (1 = down, 0 = stop, -1 = up)
@@ -88,9 +86,13 @@ boolean initLoop = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-#define MotorStepPin    D2 
-#define MotorDirPin     D1 
-#define MotorEnablePin  D5 
+#define Switch1Pin      2 
+#define Switch2Pin      5 
+#define LedPin          16 
+#define MotorStepPin    12 
+#define MotorDirPin     14 
+#define MotorEnablePin  13 
+
 #include <AccelStepper.h>
 AccelStepper Stepper1(AccelStepper::DRIVER, MotorStepPin, MotorDirPin);
 
@@ -98,6 +100,24 @@ AccelStepper Stepper1(AccelStepper::DRIVER, MotorStepPin, MotorDirPin);
 ESP8266WebServer server(80);
 // WebSockets will respond on port 81
 WebSocketsServer webSocket = WebSocketsServer(81);
+
+
+void readInputs()
+{
+  static long lastDebounceTime;  // the last time the output pin was toggled
+  long debounceDelay = 50;    // the debounce time; increase if the output flickers
+  int state1 = digitalRead(Switch1Pin);   
+  int state2 = digitalRead(Switch2Pin);   
+  if ( (millis() - lastDebounceTime) > debounceDelay) 
+  {
+    if (state1) { switch1 = false; }    
+    else { switch1 = true; }  
+
+    if (state2) { switch2 = false; }    
+    else { switch2 = true; }  
+    lastDebounceTime = millis();
+  }
+}
 
 bool loadConfig() {
   if (!helper.loadconfig()) {
@@ -109,9 +129,10 @@ bool loadConfig() {
   Serial.println();
 
   // Store variables locally
-  actualPosition = root["actualPosition"]; // 400
+  actualPosition = root["actualPosition"]; 
   Stepper1.setCurrentPosition(actualPosition);
-  maxPosition1 = root["maxPosition1"];         // 20000
+  maxPosition1 = root["maxPosition1"];         
+  speed1 = root["config_speed1"];         
   strcpy(config_name, root["config_name"]);
   strcpy(mqtt_server, root["mqtt_server"]);
   strcpy(mqtt_port, root["mqtt_port"]);
@@ -137,6 +158,7 @@ bool saveConfig() {
   json["mqtt_uid"] = mqtt_uid;
   json["mqtt_pwd"] = mqtt_pwd;
   json["config_rotation"] = config_rotation;
+  json["config_speed1"] = speed1;
 
   return helper.saveconfig(json);
 }
@@ -150,7 +172,7 @@ void sendmsg(String topic) {
   pos1 = (actualPosition * 100) / maxPosition1;
   int mappedspeed1 = map(speed1,0,2500,0,100);
 
-  msg = "{ \"set1\":" + String(set1) + ", \"position1\":" + String(pos1) + ", \"speed1\":" + String(mappedspeed1) + " }";
+  msg = "{ \"set1\":" + String(set1) + ", \"position1\":" + String(pos1) + ", \"speed1\":" + String(mappedspeed1) + ", \"switch1\":" + String(switch1 ? "true":"false") + ", \"switch2\":" + String(switch2 ? "true":"false") + " }";
   // Serial.println(msg);
   if (!mqttActive)
     return;
@@ -197,6 +219,7 @@ void processMsg(String command, String value, int motor_num,
       Serial.print("Motorspeed set to [");
       Serial.print(speed1);
       Serial.print("] ");
+      saveItNow = true;
     }
 
   } else if (command == "manual" && value == "0") {
@@ -252,6 +275,12 @@ void processMsg(String command, String value, int motor_num,
       action1 = "auto";
 
       set1 = (setPos1 * 100) / maxPosition1;
+      if (Stepper1.isRunning())
+      {
+        Stepper1.stop();
+        Serial.println("Stepper war running when new cmd arrived ");
+      }
+      
       pos1 = (actualPosition * 100) / maxPosition1;
 
       // Send the instruction to all connected devices
@@ -342,28 +371,27 @@ void motorEnable()
 
 void motorSetup()
 {
-  int rpm = 1500; //2500
-
   pinMode(MotorEnablePin, OUTPUT);
   motorDisable();
   Stepper1.setMinPulseWidth(20);
-  Stepper1.setMaxSpeed(rpm);
+  Stepper1.setMaxSpeed(speed1);
   Stepper1.setAcceleration(300);
-  Stepper1.setSpeed(rpm);
+  Stepper1.setSpeed(speed1);
 }
 
 void DisableLeds()
 {
-  pinMode(2, OUTPUT); 
-  digitalWrite(2, HIGH);
-  pinMode(16, OUTPUT); 
-  digitalWrite(16, HIGH);
+  pinMode(LedPin, OUTPUT); 
+  digitalWrite(LedPin, HIGH);
 }
 
 void setup(void) {
   Serial.begin(115200);
   delay(100);
   Serial.print("Starting now\n");
+
+  pinMode(Switch1Pin, INPUT); 
+  pinMode(Switch2Pin, INPUT); 
 
   // Reset the action
   action1 = "";
@@ -440,7 +468,7 @@ void setup(void) {
     // Save the data
     saveConfig();
   }
-  motorSetup();
+  
   /*
      Try to load FS data configuration every time when
      booting up. If loading does not work, set the default
@@ -449,12 +477,13 @@ void setup(void) {
   Serial.println("Trying to load config");
   loadDataSuccess = loadConfig();
   Serial.println("Config loaded");
+
+  motorSetup();
   if (!loadDataSuccess) {
     actualPosition = 0;
     maxPosition1 = 100000;
     Stepper1.setCurrentPosition(actualPosition);
   }
-
   /*
     Setup multi DNS (Bonjour)
     */
@@ -541,6 +570,7 @@ void setup(void) {
 }
 
 void loop(void) {
+  readInputs();
   // OTA client code
   ArduinoOTA.handle();
 
@@ -585,7 +615,7 @@ void loop(void) {
     */    
     //set1 = (setPos1 * 100) / maxPosition1;
 
-    if (actualPosition != path1 && !isMoving) {
+    if (actualPosition != path1 && !Stepper1.isRunning()) {
         motorEnable();
         Serial.print("Moving to ");
         Serial.print(setPos1);
@@ -596,9 +626,7 @@ void loop(void) {
         Serial.print(" path ");
         Serial.println(path1);
         Stepper1.moveTo(ccw ? path1 : -path1);
-        isMoving = true;
     } else if (actualPosition == path1){
-      isMoving = false;
       path1 = 0;
       action1 = "";
       set1 = (setPos1 * 100) / maxPosition1;
@@ -614,7 +642,7 @@ void loop(void) {
       saveItNow = true;
     }
 
-    if (isMoving && ((((actualPosition * 100) / maxPosition1) > lastMsgPosSend+5) || (((actualPosition * 100) / maxPosition1) < lastMsgPosSend-5)))
+    if (Stepper1.isRunning() && ((((actualPosition * 100) / maxPosition1) > lastMsgPosSend+5) || (((actualPosition * 100) / maxPosition1) < lastMsgPosSend-5)))
     {
      lastMsgPosSend = ((actualPosition * 100) / maxPosition1);
      sendmsg(outputTopic);

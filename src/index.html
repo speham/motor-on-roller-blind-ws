@@ -45,9 +45,7 @@
       $('#arrow-close1').on('click', function(){$('#setrange1').val(100);gotoPos('{"id": 1, "action": "auto", "value": 100}');});
       $('#arrow-open1').on('click', function(){$('#setrange1').val(0);gotoPos('{"id": 1, "action": "auto", "value": 0}');});
       $('#setrange1').on('change', function(){gotoPos('{"id": 1, "action": "auto", "value": ' + $('#setrange1').val() + '}')});
-      
       $('#setspeed').on('change', function(){doSend('{"id": 1, "action": "setspeed", "value": ' + $('#setspeed').val() + '}')});
-
       $('#arrow-up-man1').on('click', function(){doSend('{"id": 1, "action": "manual", "value": -1}')});
       $('#arrow-down-man1').on('click', function(){doSend('{"id": 1, "action": "manual", "value": 1}')});
       $('#arrow-stop-man1').on('click', function(){doSend('{"id": 1, "action": "manual", "value": 0}')});
@@ -99,10 +97,22 @@
           if (typeof msg.speed1 !== 'undefined'){
             $('#setspeed').attr('value', msg.speed1);
           };
+          if (typeof msg.switch1 !== 'undefined'){
+            console.log(msg.switch1);
+            var state1 = msg.switch1;
+            if (state1 == true){ $('#button-sw1').prop('checked', true ); }       
+            else {$('#button-sw1').prop('checked', false );}    
+          };
+          if (typeof msg.switch2 !== 'undefined'){
+            var state2 = msg.switch2; 
+            if (state2 == true){ $('#button-sw2').prop('checked', true); }       
+            else {$('#button-sw2').prop('checked', false );}                
+          };
         } catch(err){}
       };
     } catch (e){
       ons.notification.toast({message: 'Cannot connect to device. Retrying...', timeout: 2000});
+      $('#button-sw2').prop('checked', true);
       retry();
     };
   };
@@ -182,7 +192,7 @@
       <ons-icon id='arrow-open1' icon='fa-arrow-up' size='2x'></ons-icon>
       </ons-col>
       <ons-col>
-      <ons-range id='setrange1' style='width: 100%;' value='0'></ons-range>
+      <ons-range id='setrange1' style='width: 100%;' value='75'></ons-range>
       </ons-col>
       <ons-col width='40px' style='text-align: center; line-height: 31px;'>
       <ons-icon id='arrow-close1' icon='fa-arrow-down' size='2x'></ons-icon>
@@ -191,22 +201,31 @@
    </ons-card>
 
    <ons-card>
-    <div class='title'>Setup Speed</div>
+    <div class='title'>Inputs / Motorspeed</div>
     <div class='content'><p></p></div>
     <!-- --------------------settings -->
     <ons-row>
-      <ons-col width='50%' style='text-align: left; line-height: 60px;'>Window sensor
-        <ons-icon id='button-sw1' icon='fa-circle' size='2x'></ons-icon>
+      <ons-col width='40px' style='text-align: center; line-height: 50px;'>
+        <ons-icon icon='fa-toggle-on' size='2x'></ons-icon>
+      </ons-col>
+      <ons-col width='150px' style='text-align: right; line-height: 50px;'>switch 1
+        <ons-switch disabled style='vertical-align: middle;' id='button-sw1' ></ons-switch>
+      </ons-col>
+      <ons-col width='150px' style='text-align: center; line-height: 50px;'>switch 2
+        <ons-switch disabled style='vertical-align: middle;' id='button-sw2' ></ons-switch>
+      </ons-col>
+      <ons-col width='40px' style='text-align: center; line-height: 50px;'>
       </ons-col>
     </ons-row>
+   
     <ons-row>
       <ons-col width='40px' style='text-align: center; line-height: 31px;'>
-        <ons-icon id='icon-setsetspeed' icon='fa-tachometer' size='2x'></ons-icon>
+        <ons-icon icon='fa-tachometer' size='2x'></ons-icon>
       </ons-col>
       <ons-col>
         <ons-range id='setspeed' style='width: 100%;' value='20'></ons-range>
       </ons-col>
-        <ons-col width='40px' style='text-align: left; line-height: 31px;'>%
+      <ons-col width='40px' style='text-align: center; line-height: 31px;'>
       </ons-col>
     </ons-row>
   </ons-card>
