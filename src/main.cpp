@@ -67,9 +67,9 @@ int set1, pos1, speed1;
 bool switch1, switch2 = false;
 
 long lastMsgPosSend = 0;
-
 // Direction of blind (1 = down, 0 = stop, -1 = up)
-int path1 = 0;
+int targetPos = 0;
+long lastTargetPos = 0;
 // The set position 0-100% by the client
 int setPos1 = 0;
 
@@ -193,7 +193,8 @@ void processMsg(String command, String value, int motor_num,
     */
     if (motor_num == 1) {
       actualPosition = 0;
-      path1 = 0;
+      Stepper1.setCurrentPosition(0);
+      targetPos = 0;
       saveItNow = true;
       action1 = "manual";
     }
@@ -203,8 +204,9 @@ void processMsg(String command, String value, int motor_num,
        Store the max position of a closed blind
     */
     if (motor_num == 1) {
+      actualPosition = Stepper1.currentPosition();
       maxPosition1 = actualPosition;
-      path1 = 0;
+      targetPos = 0;
       saveItNow = true;
       action1 = "manual";
     }
@@ -228,7 +230,7 @@ void processMsg(String command, String value, int motor_num,
     */
 
     if (motor_num == 1) {
-      path1 = 0;
+      targetPos = 0;
       saveItNow = true;
       action1 = "manual";
       Stepper1.setAcceleration(200000);
@@ -239,7 +241,7 @@ void processMsg(String command, String value, int motor_num,
        Move down without limit to max position
     */
     if (motor_num == 1) {
-      path1 = 1;
+      targetPos = 1;
       action1 = "manual";
     }
 
@@ -248,7 +250,7 @@ void processMsg(String command, String value, int motor_num,
        Move up without limit to top position
     */
     if (motor_num == 1) {
-      path1 = -1;
+      targetPos = -1;
       action1 = "manual";
       Stepper1.setAcceleration(200000);
     }
@@ -270,8 +272,8 @@ void processMsg(String command, String value, int motor_num,
 
     Serial.println("Received position " + value);
     if (motor_num == 1) {
-      path1 = maxPosition1 * value.toInt() / 100;
-      setPos1 = path1; // Copy path for responding to updates
+      targetPos = maxPosition1 * value.toInt() / 100;
+      setPos1 = targetPos; // Copy path for responding to updates
       action1 = "auto";
 
       set1 = (setPos1 * 100) / maxPosition1;
@@ -280,8 +282,11 @@ void processMsg(String command, String value, int motor_num,
         Stepper1.stop();
         Serial.println("Stepper war running when new cmd arrived ");
       }
+      else
+      {
+        pos1 = (actualPosition * 100) / maxPosition1;
+      }
       
-      pos1 = (actualPosition * 100) / maxPosition1;
 
       // Send the instruction to all connected devices
       sendmsg(outputTopic);
@@ -480,6 +485,7 @@ void setup(void) {
 
   motorSetup();
   if (!loadDataSuccess) {
+    speed1  = 1500;
     actualPosition = 0;
     maxPosition1 = 100000;
     Stepper1.setCurrentPosition(actualPosition);
@@ -614,8 +620,9 @@ void loop(void) {
        Automatically open or close blind
     */    
     //set1 = (setPos1 * 100) / maxPosition1;
-
-    if (actualPosition != path1 && !Stepper1.isRunning()) {
+    
+    if (actualPosition != targetPos && (!Stepper1.isRunning() || targetPos != lastTargetPos)) {
+        lastTargetPos = targetPos;
         motorEnable();
         Serial.print("Moving to ");
         Serial.print(setPos1);
@@ -624,10 +631,10 @@ void loop(void) {
         Serial.print(" from ");
         Serial.println(actualPosition);
         Serial.print(" path ");
-        Serial.println(path1);
-        Stepper1.moveTo(ccw ? path1 : -path1);
-    } else if (actualPosition == path1){
-      path1 = 0;
+        Serial.println(targetPos);
+        Stepper1.moveTo(ccw ? targetPos : -targetPos);
+    } else if (actualPosition == targetPos){
+      targetPos = 0;
       action1 = "";
       set1 = (setPos1 * 100) / maxPosition1;
       pos1 = (actualPosition * 100) / maxPosition1;
@@ -654,10 +661,10 @@ void loop(void) {
     /*
        Manually running the blind
     */
-    if (path1 != 0)
+    if (targetPos != 0)
     {
       motorEnable();
-      Stepper1.move(ccw ? path1 : -path1);
+      Stepper1.move(ccw ? targetPos : -targetPos);
     }
     else
     {
