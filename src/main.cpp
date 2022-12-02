@@ -27,7 +27,7 @@ String APpw = "123456789";
 
 // Version number for checking if there are new code releases and notifying the
 // user
-String version = "1.4.2";
+String version = "1.4.4";
 
 NidayandHelper helper = NidayandHelper();
 
@@ -64,34 +64,36 @@ String action1;
 String msg;
 
 int set1, pos1, speed1;
-bool switch1, switch2 = false;
+bool switch1, switch2, switch3 = false;
 
-long lastMsgPosSend = 0;
+long lastMsgPosSend       = 0;
 // Direction of blind (1 = down, 0 = stop, -1 = up)
-int targetPos = 0;
-long lastTargetPos = 0;
+int   targetPos           = 0;
+long  lastTargetPos       = 0;
 // The set position 0-100% by the client
-int setPos1 = 0;
+int   setPos1             = 0;
 
-long actualPosition = 0;
-long maxPosition1 = 100000;
-
-boolean loadDataSuccess = false;
+long  actualPosition      = 0;
+long  maxPosition1        = 100000;
+int   maxSpeed            = 3000;
+int   maxAcceleration     = 1000;
+boolean loadDataSuccess   = false;
 // If true will store positions to SPIFFS
-boolean saveItNow = false;
+boolean saveItNow         = false;
 // Used for WIFI Manager callback to save parameters
-bool shouldSaveConfig = false;
+bool shouldSaveConfig     = false;
 // To enable actions first time the loop is run
-boolean initLoop = true;
+boolean initLoop          = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-#define Switch1Pin      2 
-#define Switch2Pin      5 
-#define LedPin          16 
-#define MotorStepPin    12 
-#define MotorDirPin     14 
-#define MotorEnablePin  13 
+#define Switch1Pin        4 
+#define Switch2Pin        5 
+#define Switch3Pin        2   //wifi switch //internal led
+#define LedPin            16 
+#define MotorStepPin      15 
+#define MotorDirPin       14 
+#define MotorEnablePin    13 
 
 #include <AccelStepper.h>
 AccelStepper Stepper1(AccelStepper::DRIVER, MotorStepPin, MotorDirPin);
@@ -102,22 +104,6 @@ ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 
-void readInputs()
-{
-  static long lastDebounceTime;  // the last time the output pin was toggled
-  long debounceDelay = 50;    // the debounce time; increase if the output flickers
-  int state1 = digitalRead(Switch1Pin);   
-  int state2 = digitalRead(Switch2Pin);   
-  if ( (millis() - lastDebounceTime) > debounceDelay) 
-  {
-    if (state1) { switch1 = false; }    
-    else { switch1 = true; }  
-
-    if (state2) { switch2 = false; }    
-    else { switch2 = true; }  
-    lastDebounceTime = millis();
-  }
-}
 
 bool loadConfig() {
   if (!helper.loadconfig()) {
@@ -170,15 +156,14 @@ bool saveConfig() {
 void sendmsg(String topic) {
   set1 = (setPos1 * 100) / maxPosition1;
   pos1 = (actualPosition * 100) / maxPosition1;
-  int mappedspeed1 = map(speed1,0,2500,0,100);
+  int mappedspeed1 = map(speed1,0,maxSpeed,0,100);
 
   msg = "{ \"set1\":" + String(set1) + ", \"position1\":" + String(pos1) + ", \"speed1\":" + String(mappedspeed1) + ", \"switch1\":" + String(switch1 ? "true":"false") + ", \"switch2\":" + String(switch2 ? "true":"false") + " }";
-  // Serial.println(msg);
+  Serial.println(msg);
+  webSocket.broadcastTXT(msg);
   if (!mqttActive)
     return;
-
   helper.mqtt_publish(psclient, topic, msg);
-  webSocket.broadcastTXT(msg);
 }
 /****************************************************************************************
  */
@@ -215,7 +200,7 @@ void processMsg(String command, String value, int motor_num,
        set speed for movement
     */
     if (motor_num == 1) {
-      speed1 = map(value.toInt(),0,100,100,2500);
+      speed1 = map(value.toInt(),0,100,100,maxSpeed);
       Stepper1.setSpeed(speed1);
       Stepper1.setMaxSpeed(speed1);
       Serial.print("Motorspeed set to [");
@@ -290,7 +275,7 @@ void processMsg(String command, String value, int motor_num,
 
       // Send the instruction to all connected devices
       sendmsg(outputTopic);
-      Stepper1.setAcceleration(300);
+      Stepper1.setAcceleration(maxAcceleration);
 
     }
   }
@@ -359,6 +344,50 @@ void handleNotFound() {
   server.send(404, "text/plain", message);
 }
 
+void readInputs()
+{
+  static long lastDebounceTime;  // the last time the output pin was toggled
+  long debounceDelay = 50;    // the debounce time; increase if the output flickers
+  int state1 = digitalRead(Switch1Pin);   
+  int state2 = digitalRead(Switch2Pin);   
+  int state3 = digitalRead(Switch3Pin);   
+  static int lastState1;   
+  static int lastState2;   
+  static int lastState3;   
+
+  if ( (millis() - lastDebounceTime) > debounceDelay) 
+  {
+    if (state1 != lastState1)
+    {
+      lastState1 = state1;
+      if (state1) { switch1 = false; }    
+      else { switch1 = true; }  
+      sendmsg(outputTopic);
+    }  
+
+    if (state2 != lastState2)
+    {
+      lastState2 = state2;
+      if (state2) { switch2 = false; }    
+      else { switch2 = true; }  
+      sendmsg(outputTopic);
+    }
+    
+    if (state3 != lastState3)
+    {
+      lastState3 = state3;
+      if (state3) { switch3 = false;  }    
+      else { 
+        switch3 = true;  
+      } 
+      Serial.print("Switch 3 changed to "); 
+      Serial.println(switch3); 
+    }
+    
+    lastDebounceTime = millis();
+  }
+}
+
 void motorDisable()
 {
   digitalWrite(MotorEnablePin, HIGH);
@@ -376,11 +405,9 @@ void motorEnable()
 
 void motorSetup()
 {
-  pinMode(MotorEnablePin, OUTPUT);
-  motorDisable();
   Stepper1.setMinPulseWidth(20);
   Stepper1.setMaxSpeed(speed1);
-  Stepper1.setAcceleration(300);
+  Stepper1.setAcceleration(maxAcceleration);
   Stepper1.setSpeed(speed1);
 }
 
@@ -397,6 +424,10 @@ void setup(void) {
 
   pinMode(Switch1Pin, INPUT); 
   pinMode(Switch2Pin, INPUT); 
+
+  //disable motor as early as possible
+  pinMode(MotorEnablePin, OUTPUT);
+  motorDisable();
 
   // Reset the action
   action1 = "";
@@ -485,7 +516,7 @@ void setup(void) {
 
   motorSetup();
   if (!loadDataSuccess) {
-    speed1  = 1500;
+    speed1  = maxSpeed;
     actualPosition = 0;
     maxPosition1 = 100000;
     Stepper1.setCurrentPosition(actualPosition);
