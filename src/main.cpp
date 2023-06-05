@@ -27,7 +27,7 @@ String APpw = "123456789";
 
 // Version number for checking if there are new code releases and notifying the
 // user
-String version = "1.4.4";
+String version = "1.4.5";
 
 NidayandHelper helper = NidayandHelper();
 
@@ -87,13 +87,13 @@ boolean initLoop          = true;
 // Turns counter clockwise to lower the curtain
 boolean ccw = true;
 
-#define Switch1Pin        4 
-#define Switch2Pin        5 
+#define Switch1Pin        4   // window open
+#define Switch2Pin        5   // window tilted
 #define Switch3Pin        2   //wifi switch //internal led
-#define LedPin            16 
-#define MotorStepPin      15 
-#define MotorDirPin       14 
 #define MotorEnablePin    13 
+#define MotorDirPin       14 
+#define MotorStepPin      15 
+#define LedPin            16 
 
 #include <AccelStepper.h>
 AccelStepper Stepper1(AccelStepper::DRIVER, MotorStepPin, MotorDirPin);
@@ -257,7 +257,13 @@ void processMsg(String command, String value, int motor_num,
 
     Serial.println("Received position " + value);
     if (motor_num == 1) {
-      targetPos = maxPosition1 * value.toInt() / 100;
+      int targetPosPerc = value.toInt();
+      if (!switch2 && targetPosPerc > 80)  // if window is tilted move to max 80%
+      {
+        targetPosPerc = 80;
+      }
+      
+      targetPos = maxPosition1 * targetPosPerc / 100;
       setPos1 = targetPos; // Copy path for responding to updates
       action1 = "auto";
 
@@ -652,7 +658,7 @@ void loop(void) {
     */    
     //set1 = (setPos1 * 100) / maxPosition1;
     
-    if (actualPosition != targetPos && (!Stepper1.isRunning() || targetPos != lastTargetPos)) {
+    if (actualPosition != targetPos && (!Stepper1.isRunning() || targetPos != lastTargetPos) && switch1) {
         lastTargetPos = targetPos;
         motorEnable();
         Serial.print("Moving to ");
